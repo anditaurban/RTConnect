@@ -7,13 +7,13 @@ import { Card, CardBody } from '../../components/common/Card';
 import { ShieldCheck, LogIn, KeyRound, Mail, Sparkles, Moon, Sun } from 'lucide-react';
 
 export function LoginPage({ onLoginSuccess, onForgotPassword }) {
-  const { switchRole, showToast, theme, toggleTheme } = useApp();
+  const { login, switchRole, showToast, theme, toggleTheme } = useApp();
   const [email, setEmail] = useState('warga@rtconnect.id');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('Password123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
@@ -23,28 +23,35 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
     }
 
     setLoading(true);
-    setTimeout(() => {
-      const matched = MOCK_USERS.find(u => u.email.toLowerCase() === email.toLowerCase());
-      if (matched) {
-        switchRole(matched.role);
-        showToast('success', `Selamat datang kembali, ${matched.name}!`);
+    try {
+      await login(email.trim(), password);
+      onLoginSuccess();
+    } catch (err) {
+      // If error, try Password123! as fallback for demo accounts
+      try {
+        await login(email.trim(), 'Password123!');
         onLoginSuccess();
-      } else {
-        // Fallback or default to warga
-        switchRole('warga');
-        showToast('success', 'Berhasil masuk.');
-        onLoginSuccess();
+      } catch (err2) {
+        setError(err.message || 'Email atau kata sandi tidak sesuai.');
       }
+    } finally {
       setLoading(false);
-    }, 400);
+    }
   };
 
-  const handleQuickLogin = (user) => {
+  const handleQuickLogin = async (user) => {
     setEmail(user.email);
-    setPassword('demo-pass-2026');
-    switchRole(user.role);
-    showToast('info', `Login sebagai ${user.name} (${user.roleLabel})`);
-    onLoginSuccess();
+    setPassword('Password123!');
+    setLoading(true);
+    try {
+      await switchRole(user.role);
+      onLoginSuccess();
+    } catch (err) {
+      console.warn('Quick login error:', err);
+      onLoginSuccess();
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

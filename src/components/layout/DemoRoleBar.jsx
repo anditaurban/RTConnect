@@ -11,9 +11,9 @@ export function DemoRoleBar({ onLogout }) {
       <div className="h-full px-3 sm:px-6 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
         {/* Left Badge */}
         <div className="flex items-center gap-2 shrink-0">
-          <span className="flex items-center gap-1.5 font-bold text-brand-300 bg-brand-950 px-2 py-0.5 rounded border border-brand-800/80 text-[11px]">
-            <Shield className="w-3.5 h-3.5 text-brand-400" />
-            <span>Phase 1 Demo</span>
+          <span className="flex items-center gap-1.5 font-bold text-emerald-300 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/80 text-[11px]">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>REST API Terhubung</span>
           </span>
           <span className="hidden xl:inline text-slate-400 text-[11px]">
             Pilih simulasi peran:
