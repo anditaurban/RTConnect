@@ -1,15 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
-import { MOCK_USERS } from '../../data/mockData';
 import { Input } from '../../components/common/Input';
 import { Button } from '../../components/common/Button';
 import { Card, CardBody } from '../../components/common/Card';
-import { ShieldCheck, LogIn, KeyRound, Mail, Sparkles, Moon, Sun } from 'lucide-react';
+import { LogIn, KeyRound, Mail, Moon, Sun } from 'lucide-react';
 
 export function LoginPage({ onLoginSuccess, onForgotPassword }) {
-  const { login, switchRole, showToast, theme, toggleTheme } = useApp();
-  const [email, setEmail] = useState('warga@rtconnect.id');
-  const [password, setPassword] = useState('Password123!');
+  const { login, theme, toggleTheme } = useApp();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -17,7 +16,7 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
     e.preventDefault();
     setError('');
 
-    if (!email || !password) {
+    if (!email.trim() || !password) {
       setError('Mohon lengkapi email dan kata sandi.');
       return;
     }
@@ -25,30 +24,9 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
     setLoading(true);
     try {
       await login(email.trim(), password);
-      onLoginSuccess();
+      if (onLoginSuccess) onLoginSuccess();
     } catch (err) {
-      // If error, try Password123! as fallback for demo accounts
-      try {
-        await login(email.trim(), 'Password123!');
-        onLoginSuccess();
-      } catch (err2) {
-        setError(err.message || 'Email atau kata sandi tidak sesuai.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleQuickLogin = async (user) => {
-    setEmail(user.email);
-    setPassword('Password123!');
-    setLoading(true);
-    try {
-      await switchRole(user.role);
-      onLoginSuccess();
-    } catch (err) {
-      console.warn('Quick login error:', err);
-      onLoginSuccess();
+      setError(err.message || 'Email atau kata sandi tidak sesuai.');
     } finally {
       setLoading(false);
     }
@@ -97,6 +75,7 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="nama@email.com"
                 required
+                autoComplete="email"
               />
 
               <Input
@@ -107,6 +86,7 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                autoComplete="current-password"
               />
 
               <div className="flex items-center justify-between text-xs">
@@ -137,27 +117,6 @@ export function LoginPage({ onLoginSuccess, onForgotPassword }) {
                 Masuk ke Aplikasi
               </Button>
             </form>
-
-            {/* Quick Demo Access Buttons */}
-            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300 mb-2">
-                <Sparkles className="w-3.5 h-3.5 text-brand-500" />
-                <span>Uji Coba Cepat (Akun Demo):</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                {MOCK_USERS.map((user) => (
-                  <button
-                    key={user.id}
-                    type="button"
-                    onClick={() => handleQuickLogin(user)}
-                    className="p-2 text-left rounded-lg border border-slate-200 dark:border-slate-700 hover:border-brand-300 dark:hover:border-brand-600 hover:bg-brand-50/50 dark:hover:bg-slate-700/50 transition-colors"
-                  >
-                    <p className="font-semibold text-slate-800 dark:text-slate-200 text-[11px] truncate">{user.roleLabel}</p>
-                    <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate">{user.name}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
           </CardBody>
         </Card>
 

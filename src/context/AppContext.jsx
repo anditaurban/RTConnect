@@ -1,32 +1,38 @@
 import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
-import {
-  MOCK_USERS,
-  MOCK_REGIONS,
-  MOCK_RESIDENTS,
-  MOCK_FAMILIES,
-  MOCK_LETTER_TYPES,
-  MOCK_LETTER_REQUESTS,
-  MOCK_FINANCE_TRANSACTIONS,
-  MOCK_DUES_TYPES,
-  MOCK_DUES_BILLS,
-  MOCK_ANNOUNCEMENTS,
-  MOCK_COMPLAINTS,
-  MOCK_EVENTS,
-  MOCK_ASSETS,
-  MOCK_REGION_SETTINGS,
-} from '../data/mockData';
 import { apiService } from '../services/apiService';
 import { tokenStorage } from '../services/apiClient';
 
 const AppContext = createContext(null);
 
-const ROLE_CREDENTIALS = {
-  warga: { email: 'warga@rtconnect.id', password: 'Password123!' },
-  ketua_rt: { email: 'ketua.rt01@rtconnect.id', password: 'Password123!' },
-  ketua_rw: { email: 'ketua.rw@rtconnect.id', password: 'Password123!' },
-  sekretaris: { email: 'sekretaris@rtconnect.id', password: 'Password123!' },
-  bendahara: { email: 'bendahara@rtconnect.id', password: 'Password123!' },
-  petugas: { email: 'petugas@rtconnect.id', password: 'Password123!' },
+const ROLE_LABELS = {
+  warga: 'Warga RT 01',
+  ketua_rt: 'Ketua RT 01',
+  ketua_rw: 'Ketua RW 05',
+  sekretaris: 'Sekretaris RT 01',
+  bendahara: 'Bendahara RT 01',
+  petugas: 'Petugas Lingkungan',
+  super_admin: 'Super Admin',
+};
+
+const DEFAULT_REGION_SETTINGS = {
+  rwName: 'Rukun Warga 05',
+  subdistrict: 'Kelurahan Kebon Jeruk',
+  district: 'Kecamatan Kebon Jeruk',
+  city: 'Kota Administrasi Jakarta Barat',
+  province: 'DKI Jakarta',
+  postalCode: '11530',
+  contactCenter: '0812-9876-5432',
+  bankAccount: {
+    bankName: 'Bank Central Asia (BCA)',
+    accountNumber: '8820-1928-33',
+    accountHolder: 'KAS RT 01 RW 05',
+  },
+  letterHeader: {
+    government: 'PEMERINTAH KOTA ADMINISTRASI JAKARTA BARAT',
+    district: 'KECAMATAN KEBON JERUK — KELURAHAN KEBON JERUK',
+    neighborhood: 'RUKUN WARGA 05 / RUKUN TETANGGA 01',
+    address: 'Sekretariat: Jl. Mawar Indah Blok B1 No. 01, Telp: 0813-1122-3344',
+  },
 };
 
 const normalizeRegionSettings = (apiSettings, fallback) => {
@@ -59,29 +65,28 @@ export function AppProvider({ children }) {
     setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  // Current user & role selection
-  const [activeRole, setActiveRole] = useState('warga');
-  const [currentUser, setCurrentUser] = useState(() => {
-    return MOCK_USERS.find(u => u.role === 'warga') || MOCK_USERS[0];
-  });
+  // Auth & Session state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   // Loading & connection status
   const [isLoading, setIsLoading] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState(true);
 
-  // Data collections state
-  const [residents, setResidents] = useState(MOCK_RESIDENTS);
-  const [families, setFamilies] = useState(MOCK_FAMILIES);
-  const [letterRequests, setLetterRequests] = useState(MOCK_LETTER_REQUESTS);
-  const [letterTypes, setLetterTypes] = useState(MOCK_LETTER_TYPES);
-  const [financeTransactions, setFinanceTransactions] = useState(MOCK_FINANCE_TRANSACTIONS);
-  const [duesBills, setDuesBills] = useState(MOCK_DUES_BILLS);
-  const [duesTypes, setDuesTypes] = useState(MOCK_DUES_TYPES);
-  const [announcements, setAnnouncements] = useState(MOCK_ANNOUNCEMENTS);
-  const [complaints, setComplaints] = useState(MOCK_COMPLAINTS);
-  const [events, setEvents] = useState(MOCK_EVENTS);
-  const [assets, setAssets] = useState(MOCK_ASSETS);
-  const [regionSettings, setRegionSettings] = useState(MOCK_REGION_SETTINGS);
+  // Live domain collections — 100% sourced from REST API
+  const [residents, setResidents] = useState([]);
+  const [families, setFamilies] = useState([]);
+  const [letterRequests, setLetterRequests] = useState([]);
+  const [letterTypes, setLetterTypes] = useState([]);
+  const [financeTransactions, setFinanceTransactions] = useState([]);
+  const [duesBills, setDuesBills] = useState([]);
+  const [duesTypes, setDuesTypes] = useState([]);
+  const [announcements, setAnnouncements] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [assets, setAssets] = useState([]);
+  const [regionSettings, setRegionSettings] = useState(DEFAULT_REGION_SETTINGS);
 
   // Global toast notification state
   const [toast, setToast] = useState(null);
@@ -94,6 +99,20 @@ export function AppProvider({ children }) {
   }, []);
 
   const closeToast = useCallback(() => setToast(null), []);
+
+  const activeRole = currentUser?.role || 'warga';
+
+  // Format user object from API to ensure required UI fields
+  const formatApiUser = (user) => {
+    if (!user) return null;
+    return {
+      ...user,
+      role: user.role || 'warga',
+      roleLabel: user.roleLabel || ROLE_LABELS[user.role] || 'Warga RT 01',
+      avatar: user.avatarUrl || user.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
+      region: user.regionName || user.region || 'RT 01 / RW 05',
+    };
+  };
 
   // Fetch all domain data from live REST API
   const loadAllData = useCallback(async () => {
@@ -129,17 +148,16 @@ export function AppProvider({ children }) {
         settRes,
       ] = results;
 
-      if (resRes.status === 'fulfilled' && Array.isArray(resRes.value) && resRes.value.length > 0) {
+      if (resRes.status === 'fulfilled' && Array.isArray(resRes.value)) {
         setResidents(resRes.value);
       }
-      if (famRes.status === 'fulfilled' && Array.isArray(famRes.value) && famRes.value.length > 0) {
+      if (famRes.status === 'fulfilled' && Array.isArray(famRes.value)) {
         setFamilies(famRes.value);
       }
-      if (lTypeRes.status === 'fulfilled' && Array.isArray(lTypeRes.value) && lTypeRes.value.length > 0) {
+      if (lTypeRes.status === 'fulfilled' && Array.isArray(lTypeRes.value)) {
         setLetterTypes(lTypeRes.value);
       }
       if (lReqRes.status === 'fulfilled' && Array.isArray(lReqRes.value)) {
-        // Ensure each letter request has standard fallback fields
         const formatted = lReqRes.value.map(req => ({
           ...req,
           letterNumber: req.letterNumber || null,
@@ -159,7 +177,7 @@ export function AppProvider({ children }) {
       if (duesBillRes.status === 'fulfilled' && Array.isArray(duesBillRes.value)) {
         setDuesBills(duesBillRes.value);
       }
-      if (duesTypeRes.status === 'fulfilled' && Array.isArray(duesTypeRes.value) && duesTypeRes.value.length > 0) {
+      if (duesTypeRes.status === 'fulfilled' && Array.isArray(duesTypeRes.value)) {
         setDuesTypes(duesTypeRes.value);
       }
       if (annRes.status === 'fulfilled' && Array.isArray(annRes.value)) {
@@ -184,83 +202,53 @@ export function AppProvider({ children }) {
 
       setIsApiConnected(true);
     } catch (err) {
-      console.warn('Gagal memuat data dari REST API. Menggunakan cadangan data lokal.', err);
+      console.warn('Gagal memuat data dari REST API:', err);
       setIsApiConnected(false);
     } finally {
       setIsLoading(false);
     }
   }, []);
 
-  // Switch demo role helper: authenticates with live backend and loads role-scoped data
-  const switchRole = useCallback(async (roleKey) => {
-    const cred = ROLE_CREDENTIALS[roleKey];
-    const fallbackUser = MOCK_USERS.find(u => u.role === roleKey) || MOCK_USERS[0];
-
-    setActiveRole(roleKey);
-    setCurrentUser(fallbackUser);
-
-    if (cred) {
-      try {
-        const loginData = await apiService.login(cred.email, cred.password);
-        if (loginData?.user) {
-          const apiUser = {
-            ...fallbackUser,
-            ...loginData.user,
-            role: loginData.user.role || roleKey,
-            roleLabel: fallbackUser.roleLabel,
-            region: loginData.user.regionName || fallbackUser.region,
-          };
-          setCurrentUser(apiUser);
-        }
-        await loadAllData();
-        showToast('info', `Beralih ke mode demo: ${fallbackUser.name} (${fallbackUser.roleLabel})`);
-      } catch (err) {
-        console.warn(`Gagal login live API untuk role ${roleKey}:`, err.message);
-        showToast('info', `Beralih ke mode demo: ${fallbackUser.name} (${fallbackUser.roleLabel})`);
-      }
-    }
-  }, [loadAllData, showToast]);
-
-  // Initial authentication & data load on mount
+  // Check auth session on startup using stored token
   useEffect(() => {
-    const initApp = async () => {
-      const defaultCred = ROLE_CREDENTIALS['warga'];
+    const checkAuth = async () => {
+      const token = tokenStorage.getToken();
+      if (!token) {
+        setIsAuthenticated(false);
+        setIsCheckingAuth(false);
+        return;
+      }
+
       try {
-        const loginData = await apiService.login(defaultCred.email, defaultCred.password);
-        if (loginData?.user) {
-          const fallbackUser = MOCK_USERS.find(u => u.role === 'warga');
-          setCurrentUser({
-            ...fallbackUser,
-            ...loginData.user,
-            role: 'warga',
-            roleLabel: fallbackUser?.roleLabel || 'Warga RT 01',
-          });
+        const me = await apiService.getMe();
+        if (me) {
+          const user = formatApiUser(me);
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+          await loadAllData();
+        } else {
+          tokenStorage.clear();
+          setIsAuthenticated(false);
         }
-        await loadAllData();
       } catch (err) {
-        console.warn('API awal belum terhubung, menggunakan data lokal:', err.message);
+        tokenStorage.clear();
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
 
-    initApp();
+    checkAuth();
   }, [loadAllData]);
 
-  // Custom login handler
+  // Real API Login
   const login = async (email, password) => {
     setIsLoading(true);
     try {
       const loginData = await apiService.login(email, password);
-      const user = loginData.user;
-      const matchedRole = user.role || 'warga';
-      const fallbackUser = MOCK_USERS.find(u => u.role === matchedRole) || MOCK_USERS[0];
-
-      setActiveRole(matchedRole);
-      setCurrentUser({
-        ...fallbackUser,
-        ...user,
-        roleLabel: fallbackUser.roleLabel,
-      });
-
+      const user = formatApiUser(loginData.user);
+      setCurrentUser(user);
+      setIsAuthenticated(true);
       await loadAllData();
       showToast('success', `Selamat datang kembali, ${user.name}!`);
       return { success: true, user };
@@ -272,10 +260,31 @@ export function AppProvider({ children }) {
     }
   };
 
+  // Real API Logout
   const logout = async () => {
-    await apiService.logout();
+    try {
+      await apiService.logout();
+    } catch (e) {
+      // ignore
+    }
     tokenStorage.clear();
-    showToast('info', 'Anda telah keluar dari sistem.');
+    setCurrentUser(null);
+    setIsAuthenticated(false);
+    setResidents([]);
+    setFamilies([]);
+    setLetterRequests([]);
+    setFinanceTransactions([]);
+    setDuesBills([]);
+    setAnnouncements([]);
+    setComplaints([]);
+    setEvents([]);
+    setAssets([]);
+    showToast('info', 'Anda telah keluar dari aplikasi RTConnect.');
+  };
+
+  // Backward compatibility alias for any remaining callers
+  const switchRole = (roleKey) => {
+    console.info(`Peralihan role sekarang dilakukan via login akun resmi (${roleKey}).`);
   };
 
   // --- ACTIONS (REST API INTEGRATED) ---
@@ -295,15 +304,8 @@ export function AppProvider({ children }) {
       return newRes;
     } catch (err) {
       console.error('addResident error:', err);
-      // Optimistic local update fallback
-      const fallbackRes = {
-        ...data,
-        id: `res-${Date.now()}`,
-        statusKependudukan: 'Aktif',
-      };
-      setResidents(prev => [fallbackRes, ...prev]);
-      showToast('success', `Data warga ${data.name} tersimpan.`);
-      return fallbackRes;
+      showToast('error', err.message || 'Gagal menambahkan data warga.');
+      throw err;
     }
   };
 
@@ -314,14 +316,14 @@ export function AppProvider({ children }) {
       showToast('success', 'Data warga berhasil diperbarui.');
     } catch (err) {
       console.error('updateResident error:', err);
-      setResidents(prev => prev.map(r => r.id === id ? { ...r, ...data } : r));
-      showToast('success', 'Data warga berhasil diperbarui.');
+      showToast('error', err.message || 'Gagal memperbarui data warga.');
+      throw err;
     }
   };
 
   const deleteResident = (id) => {
     setResidents(prev => prev.filter(r => r.id !== id));
-    showToast('warning', 'Data warga berhasil dihapus dari daftar.');
+    showToast('warning', 'Data warga berhasil dihapus.');
   };
 
   // 2. Letters Actions
@@ -337,14 +339,14 @@ export function AppProvider({ children }) {
         id: created.id || `req-${Date.now()}`,
         letterTypeId: requestData.letterTypeId,
         letterName: letterType ? letterType.name : (created.letterName || 'Surat Administrasi'),
-        residentId: currentUser.residentId || 'res-01',
-        residentName: currentUser.name,
-        nik: currentUser.nik || '3171011508890002',
-        noKK: currentUser.noKK || '3171012309870001',
+        residentId: currentUser?.residentId || created.residentId || 'res-01',
+        residentName: currentUser?.name || 'Warga',
+        nik: currentUser?.nik || '3171011508890002',
+        noKK: currentUser?.noKK || '3171012309870001',
         rt: 'RT 01',
         rw: 'RW 05',
         purpose: requestData.purpose,
-        referenceNo: created.reference_no || created.referenceNo || `REQ/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(1000 + Math.random() * 9000)}`,
+        referenceNo: created.reference_no || created.referenceNo || `REQ/${Date.now()}`,
         letterNumber: null,
         status: 'Diajukan',
         createdAt: new Date().toISOString(),
@@ -364,97 +366,70 @@ export function AppProvider({ children }) {
       return newReq;
     } catch (err) {
       console.error('addLetterRequest error:', err);
-      // Fallback
-      const newReq = {
-        id: `req-${Date.now()}`,
-        letterTypeId: requestData.letterTypeId,
-        letterName: letterType ? letterType.name : 'Surat Administrasi',
-        residentId: currentUser.residentId || 'res-01',
-        residentName: currentUser.name,
-        nik: currentUser.nik || '3171011508890002',
-        noKK: currentUser.noKK || '3171012309870001',
-        rt: 'RT 01',
-        rw: 'RW 05',
-        purpose: requestData.purpose,
-        referenceNo: `REQ/${new Date().getFullYear()}/${String(new Date().getMonth() + 1).padStart(2, '0')}/${Math.floor(1000 + Math.random() * 9000)}`,
-        letterNumber: null,
-        status: 'Diajukan',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        notes: 'Permohonan baru, menunggu verifikasi pengurus.',
-        timeline: [
-          {
-            status: 'Diajukan',
-            date: new Date().toISOString(),
-            note: 'Permohonan diajukan oleh pemohon.',
-          },
-        ],
-      };
-      setLetterRequests(prev => [newReq, ...prev]);
-      showToast('success', `Surat permohonan berhasil dikirim dengan no ref: ${newReq.referenceNo}`);
-      return newReq;
+      showToast('error', err.message || 'Gagal mengirim permohonan surat.');
+      throw err;
     }
   };
 
   const updateLetterRequest = async (id, data) => {
     try {
       await apiService.updateLetterRequest(id, data);
+      setLetterRequests(prev => prev.map(req => {
+        if (req.id !== id) return req;
+        return {
+          ...req,
+          ...data,
+          updatedAt: new Date().toISOString(),
+          timeline: [
+            ...(req.timeline || []),
+            {
+              status: 'Diperbarui',
+              date: new Date().toISOString(),
+              note: 'Data permohonan surat diperbaiki oleh pemohon.',
+            },
+          ],
+        };
+      }));
+      showToast('success', 'Perubahan permohonan surat berhasil dikirim.');
     } catch (err) {
-      console.warn('updateLetterRequest API error:', err.message);
+      console.warn('updateLetterRequest error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui permohonan surat.');
     }
-
-    setLetterRequests(prev => prev.map(req => {
-      if (req.id !== id) return req;
-      return {
-        ...req,
-        ...data,
-        updatedAt: new Date().toISOString(),
-        timeline: [
-          ...(req.timeline || []),
-          {
-            status: 'Diperbarui',
-            date: new Date().toISOString(),
-            note: 'Data permohonan surat diperbaiki oleh pemohon.',
-          },
-        ],
-      };
-    }));
-    showToast('success', 'Perubahan permohonan surat berhasil dikirim.');
   };
 
   const reviewLetterRequest = async (id, newStatus, notes, letterNumber = null) => {
     try {
       await apiService.reviewLetterRequest(id, newStatus, notes, letterNumber);
+      setLetterRequests(prev => prev.map(req => {
+        if (req.id !== id) return req;
+
+        const generatedNumber = (newStatus === 'Disetujui' && !letterNumber)
+          ? `470/${String(Math.floor(10 + Math.random() * 90))}/RT.01-RW.05/${['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][new Date().getMonth()]}/${new Date().getFullYear()}`
+          : letterNumber || req.letterNumber;
+
+        return {
+          ...req,
+          status: newStatus,
+          notes: notes || req.notes,
+          letterNumber: generatedNumber,
+          updatedAt: new Date().toISOString(),
+          reviewedBy: currentUser?.name || 'Pengurus',
+          approvedBy: newStatus === 'Disetujui' ? (currentUser?.name || 'Ketua RT') : req.approvedBy,
+          timeline: [
+            ...(req.timeline || []),
+            {
+              status: newStatus,
+              date: new Date().toISOString(),
+              note: notes || `Status diubah menjadi ${newStatus} oleh ${currentUser?.name || 'Pengurus'}.`,
+            },
+          ],
+        };
+      }));
+      showToast('success', `Status pengajuan surat berhasil diperbarui menjadi "${newStatus}".`);
     } catch (err) {
-      console.warn('reviewLetterRequest API error:', err.message);
+      console.warn('reviewLetterRequest error:', err.message);
+      showToast('error', err.message || 'Gagal memverifikasi pengajuan surat.');
     }
-
-    setLetterRequests(prev => prev.map(req => {
-      if (req.id !== id) return req;
-
-      const generatedNumber = (newStatus === 'Disetujui' && !letterNumber)
-        ? `470/${String(Math.floor(10 + Math.random() * 90))}/RT.01-RW.05/${['I','II','III','IV','V','VI','VII','VIII','IX','X','XI','XII'][new Date().getMonth()]}/${new Date().getFullYear()}`
-        : letterNumber || req.letterNumber;
-
-      return {
-        ...req,
-        status: newStatus,
-        notes: notes || req.notes,
-        letterNumber: generatedNumber,
-        updatedAt: new Date().toISOString(),
-        reviewedBy: currentUser.name,
-        approvedBy: newStatus === 'Disetujui' ? currentUser.name : req.approvedBy,
-        timeline: [
-          ...(req.timeline || []),
-          {
-            status: newStatus,
-            date: new Date().toISOString(),
-            note: notes || `Status diubah menjadi ${newStatus} oleh ${currentUser.name}.`,
-          },
-        ],
-      };
-    }));
-    showToast('success', `Status pengajuan surat berhasil diperbarui menjadi "${newStatus}".`);
   };
 
   const deleteLetterRequest = (id) => {
@@ -471,7 +446,7 @@ export function AppProvider({ children }) {
         ...created,
         id: created.id || `fin-${Date.now()}`,
         transactionCode: created.transaction_code || created.transactionCode || `TRX-${Date.now()}`,
-        recordedBy: `${currentUser.name} (${currentUser.roleLabel})`,
+        recordedBy: `${currentUser?.name} (${currentUser?.roleLabel})`,
         rt: 'RT 01',
         rw: 'RW 05',
       };
@@ -479,55 +454,46 @@ export function AppProvider({ children }) {
       showToast('success', `Transaksi kas ${data.type === 'in' ? 'masuk' : 'keluar'} berhasil dicatat.`);
     } catch (err) {
       console.error('addFinanceTransaction error:', err);
-      const fallbackTx = {
-        ...data,
-        id: `fin-${Date.now()}`,
-        transactionCode: `TRX-${Date.now()}`,
-        recordedBy: `${currentUser.name} (${currentUser.roleLabel})`,
-        rt: 'RT 01',
-        rw: 'RW 05',
-      };
-      setFinanceTransactions(prev => [fallbackTx, ...prev]);
-      showToast('success', `Transaksi kas ${data.type === 'in' ? 'masuk' : 'keluar'} berhasil dicatat.`);
+      showToast('error', err.message || 'Gagal mencatat transaksi kas.');
     }
   };
 
   const updateFinanceTransaction = async (id, data) => {
     try {
       await apiService.updateFinanceTransaction(id, data);
+      setFinanceTransactions(prev => prev.map(t => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          ...data,
+          auditNote: `${data.auditNote || 'Koreksi transaksi'} (diubah oleh ${currentUser?.name})`,
+        };
+      }));
+      showToast('success', 'Data transaksi kas berhasil diperbarui.');
     } catch (err) {
       console.warn('updateFinanceTransaction error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui transaksi.');
     }
-
-    setFinanceTransactions(prev => prev.map(t => {
-      if (t.id !== id) return t;
-      return {
-        ...t,
-        ...data,
-        auditNote: `${data.auditNote || 'Koreksi transaksi'} (diubah oleh ${currentUser.name})`,
-      };
-    }));
-    showToast('success', 'Data transaksi kas berhasil diperbarui.');
   };
 
   const voidFinanceTransaction = async (id, reason) => {
     try {
       await apiService.voidFinanceTransaction(id, reason);
+      setFinanceTransactions(prev => prev.map(t => {
+        if (t.id !== id) return t;
+        return {
+          ...t,
+          status: 'void',
+          category: `[BATAL/VOID] ${t.category}`,
+          amount: 0,
+          auditNote: `Dibatalkan oleh ${currentUser?.name}. Alasan: ${reason}`,
+        };
+      }));
+      showToast('warning', 'Transaksi kas berhasil dibatalkan (void) dengan catatan audit.');
     } catch (err) {
       console.warn('voidFinanceTransaction error:', err.message);
+      showToast('error', err.message || 'Gagal membatalkan transaksi.');
     }
-
-    setFinanceTransactions(prev => prev.map(t => {
-      if (t.id !== id) return t;
-      return {
-        ...t,
-        status: 'void',
-        category: `[BATAL/VOID] ${t.category}`,
-        amount: 0,
-        auditNote: `Dibatalkan oleh ${currentUser.name}. Alasan: ${reason}`,
-      };
-    }));
-    showToast('warning', 'Transaksi kas berhasil dibatalkan (void) dengan catatan audit.');
   };
 
   // 4. Dues Actions
@@ -569,9 +535,7 @@ export function AppProvider({ children }) {
       showToast('success', `Jenis iuran ${data.name} berhasil ditambahkan.`);
     } catch (err) {
       console.warn('addDuesType error:', err.message);
-      const fallbackType = { ...data, id: `dt-${Date.now()}`, active: true };
-      setDuesTypes(prev => [...prev, fallbackType]);
-      showToast('success', `Jenis iuran ${data.name} berhasil ditambahkan.`);
+      showToast('error', err.message || 'Gagal menambahkan jenis iuran.');
     }
   };
 
@@ -588,61 +552,61 @@ export function AppProvider({ children }) {
   const payDuesBill = async (billId, paymentMethod, proofUrl) => {
     try {
       await apiService.payDuesBill(billId, paymentMethod, proofUrl);
+      setDuesBills(prev => prev.map(b => {
+        if (b.id !== billId) return b;
+        return {
+          ...b,
+          status: 'Menunggu Verifikasi',
+          paymentMethod,
+          paymentDate: new Date().toISOString(),
+          paymentProofUrl: proofUrl || 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&auto=format&fit=crop&q=80',
+          verificationNotes: 'Menunggu verifikasi pembayaran oleh bendahara.',
+        };
+      }));
+      showToast('success', 'Bukti pembayaran berhasil diunggah dan sedang diverifikasi bendahara.');
     } catch (err) {
-      console.warn('payDuesBill API error:', err.message);
+      console.warn('payDuesBill error:', err.message);
+      showToast('error', err.message || 'Gagal mengirim pembayaran.');
     }
-
-    setDuesBills(prev => prev.map(b => {
-      if (b.id !== billId) return b;
-      return {
-        ...b,
-        status: 'Menunggu Verifikasi',
-        paymentMethod,
-        paymentDate: new Date().toISOString(),
-        paymentProofUrl: proofUrl || 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&auto=format&fit=crop&q=80',
-        verificationNotes: 'Menunggu verifikasi pembayaran oleh bendahara.',
-      };
-    }));
-    showToast('success', 'Bukti pembayaran berhasil diunggah dan sedang diverifikasi bendahara.');
   };
 
   const verifyDuesBill = async (billId, isApproved, notes) => {
     try {
       await apiService.verifyDuesBill(billId, isApproved, notes);
-      // Reload finance transactions if approved since backend auto-books cash
       if (isApproved) {
         apiService.getFinanceTransactions().then(txs => {
           if (Array.isArray(txs)) setFinanceTransactions(txs);
         }).catch(() => {});
       }
+
+      setDuesBills(prev => prev.map(b => {
+        if (b.id !== billId) return b;
+        const targetBill = b;
+        const newStatus = isApproved ? 'Lunas' : 'Belum Dibayar';
+
+        if (isApproved) {
+          addFinanceTransaction({
+            date: new Date().toISOString().split('T')[0],
+            type: 'in',
+            category: 'Iuran Warga',
+            amount: targetBill.amount,
+            description: `Pembayaran iuran ${targetBill.duesName} - an. ${targetBill.residentName} (${targetBill.billNumber})`,
+            receiptUrl: targetBill.paymentProofUrl,
+            auditNote: `Diverifikasi oleh ${currentUser?.name}`,
+          });
+        }
+
+        return {
+          ...b,
+          status: newStatus,
+          verificationNotes: notes || (isApproved ? 'Pembayaran telah diverifikasi sah.' : 'Bukti pembayaran ditolak. Silakan unggah bukti yang sesuai.'),
+        };
+      }));
+      showToast(isApproved ? 'success' : 'warning', isApproved ? 'Pembayaran berhasil diverifikasi lunas.' : 'Pembayaran ditolak.');
     } catch (err) {
-      console.warn('verifyDuesBill API error:', err.message);
+      console.warn('verifyDuesBill error:', err.message);
+      showToast('error', err.message || 'Gagal memverifikasi tagihan.');
     }
-
-    setDuesBills(prev => prev.map(b => {
-      if (b.id !== billId) return b;
-      const targetBill = b;
-      const newStatus = isApproved ? 'Lunas' : 'Belum Dibayar';
-
-      if (isApproved) {
-        addFinanceTransaction({
-          date: new Date().toISOString().split('T')[0],
-          type: 'in',
-          category: 'Iuran Warga',
-          amount: targetBill.amount,
-          description: `Pembayaran iuran ${targetBill.duesName} - an. ${targetBill.residentName} (${targetBill.billNumber})`,
-          receiptUrl: targetBill.paymentProofUrl,
-          auditNote: `Diverifikasi oleh ${currentUser.name}`,
-        });
-      }
-
-      return {
-        ...b,
-        status: newStatus,
-        verificationNotes: notes || (isApproved ? 'Pembayaran telah diverifikasi sah.' : 'Bukti pembayaran ditolak. Silakan unggah bukti yang sesuai.'),
-      };
-    }));
-    showToast(isApproved ? 'success' : 'warning', isApproved ? 'Pembayaran berhasil diverifikasi lunas.' : 'Pembayaran ditolak.');
   };
 
   // 5. Announcements Actions
@@ -654,41 +618,36 @@ export function AppProvider({ children }) {
         ...created,
         id: created.id || `ann-${Date.now()}`,
         date: new Date().toISOString(),
-        author: `${currentUser.name} (${currentUser.roleLabel})`,
+        author: `${currentUser?.name} (${currentUser?.roleLabel})`,
       };
       setAnnouncements(prev => [newAnn, ...prev]);
       showToast('success', 'Pengumuman baru berhasil diterbitkan.');
     } catch (err) {
-      console.warn('addAnnouncement API error:', err.message);
-      const fallbackAnn = {
-        ...data,
-        id: `ann-${Date.now()}`,
-        date: new Date().toISOString(),
-        author: `${currentUser.name} (${currentUser.roleLabel})`,
-      };
-      setAnnouncements(prev => [fallbackAnn, ...prev]);
-      showToast('success', 'Pengumuman baru berhasil diterbitkan.');
+      console.warn('addAnnouncement error:', err.message);
+      showToast('error', err.message || 'Gagal menerbitkan pengumuman.');
     }
   };
 
   const updateAnnouncement = async (id, data) => {
     try {
       await apiService.updateAnnouncement(id, data);
+      setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
+      showToast('success', 'Pengumuman berhasil diperbarui.');
     } catch (err) {
       console.warn('updateAnnouncement error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui pengumuman.');
     }
-    setAnnouncements(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
-    showToast('success', 'Pengumuman berhasil diperbarui.');
   };
 
   const deleteAnnouncement = async (id) => {
     try {
       await apiService.deleteAnnouncement(id);
+      setAnnouncements(prev => prev.filter(a => a.id !== id));
+      showToast('warning', 'Pengumuman berhasil dihapus.');
     } catch (err) {
       console.warn('deleteAnnouncement error:', err.message);
+      showToast('error', err.message || 'Gagal menghapus pengumuman.');
     }
-    setAnnouncements(prev => prev.filter(a => a.id !== id));
-    showToast('warning', 'Pengumuman berhasil dihapus.');
   };
 
   // 6. Complaints Actions
@@ -699,9 +658,9 @@ export function AppProvider({ children }) {
         ...data,
         ...created,
         id: created.id || `cmp-${Date.now()}`,
-        reporterId: currentUser.residentId || currentUser.id,
-        reporterName: currentUser.name,
-        reporterPhone: currentUser.phone || '0812-8899-0011',
+        reporterId: currentUser?.residentId || currentUser?.id,
+        reporterName: currentUser?.name,
+        reporterPhone: currentUser?.phone || '0812-8899-0011',
         rt: 'RT 01',
         status: 'Baru',
         createdAt: new Date().toISOString(),
@@ -713,32 +672,19 @@ export function AppProvider({ children }) {
       showToast('success', 'Aspirasi/pengaduan Anda berhasil dikirim ke pengurus RT.');
     } catch (err) {
       console.warn('addComplaint error:', err.message);
-      const fallbackCmp = {
-        ...data,
-        id: `cmp-${Date.now()}`,
-        reporterId: currentUser.residentId || currentUser.id,
-        reporterName: currentUser.name,
-        reporterPhone: currentUser.phone || '0812-8899-0011',
-        rt: 'RT 01',
-        status: 'Baru',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        assignedTo: null,
-        responses: [],
-      };
-      setComplaints(prev => [fallbackCmp, ...prev]);
-      showToast('success', 'Aspirasi/pengaduan Anda berhasil dikirim ke pengurus RT.');
+      showToast('error', err.message || 'Gagal mengirim pengaduan.');
     }
   };
 
   const updateComplaint = async (id, data) => {
     try {
       await apiService.updateComplaint(id, data);
+      setComplaints(prev => prev.map(c => c.id === id ? { ...c, ...data, updatedAt: new Date().toISOString() } : c));
+      showToast('success', 'Laporan aduan berhasil diperbarui.');
     } catch (err) {
       console.warn('updateComplaint error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui aduan.');
     }
-    setComplaints(prev => prev.map(c => c.id === id ? { ...c, ...data, updatedAt: new Date().toISOString() } : c));
-    showToast('success', 'Laporan aduan berhasil diperbarui.');
   };
 
   const respondToComplaint = async (id, responseText, newStatus, assignedTo) => {
@@ -750,28 +696,29 @@ export function AppProvider({ children }) {
           assignedTo: assignedTo !== undefined ? assignedTo : undefined,
         });
       }
+
+      setComplaints(prev => prev.map(c => {
+        if (c.id !== id) return c;
+        return {
+          ...c,
+          status: newStatus || c.status,
+          assignedTo: assignedTo !== undefined ? assignedTo : c.assignedTo,
+          updatedAt: new Date().toISOString(),
+          responses: [
+            ...(c.responses || []),
+            {
+              author: `${currentUser?.name} (${currentUser?.roleLabel})`,
+              date: new Date().toISOString(),
+              message: responseText,
+            },
+          ],
+        };
+      }));
+      showToast('success', 'Tanggapan dan status pengaduan berhasil diperbarui.');
     } catch (err) {
       console.warn('respondToComplaint error:', err.message);
+      showToast('error', err.message || 'Gagal menanggapi pengaduan.');
     }
-
-    setComplaints(prev => prev.map(c => {
-      if (c.id !== id) return c;
-      return {
-        ...c,
-        status: newStatus || c.status,
-        assignedTo: assignedTo !== undefined ? assignedTo : c.assignedTo,
-        updatedAt: new Date().toISOString(),
-        responses: [
-          ...(c.responses || []),
-          {
-            author: `${currentUser.name} (${currentUser.roleLabel})`,
-            date: new Date().toISOString(),
-            message: responseText,
-          },
-        ],
-      };
-    }));
-    showToast('success', 'Tanggapan dan status pengaduan berhasil diperbarui.');
   };
 
   const deleteComplaint = (id) => {
@@ -794,35 +741,30 @@ export function AppProvider({ children }) {
       showToast('success', 'Agenda kegiatan berhasil dijadwalkan.');
     } catch (err) {
       console.warn('addEvent error:', err.message);
-      const fallbackEvt = {
-        ...data,
-        id: `evt-${Date.now()}`,
-        status: 'Akan Datang',
-        attendeesCount: 0,
-      };
-      setEvents(prev => [fallbackEvt, ...prev]);
-      showToast('success', 'Agenda kegiatan berhasil dijadwalkan.');
+      showToast('error', err.message || 'Gagal menjadwalkan kegiatan.');
     }
   };
 
   const updateEvent = async (id, data) => {
     try {
       await apiService.updateEvent(id, data);
+      setEvents(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
+      showToast('success', 'Agenda kegiatan berhasil diperbarui.');
     } catch (err) {
       console.warn('updateEvent error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui kegiatan.');
     }
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, ...data } : e));
-    showToast('success', 'Agenda kegiatan berhasil diperbarui.');
   };
 
   const deleteEvent = async (id) => {
     try {
       await apiService.deleteEvent(id);
+      setEvents(prev => prev.filter(e => e.id !== id));
+      showToast('warning', 'Agenda kegiatan berhasil dihapus.');
     } catch (err) {
       console.warn('deleteEvent error:', err.message);
+      showToast('error', err.message || 'Gagal menghapus kegiatan.');
     }
-    setEvents(prev => prev.filter(e => e.id !== id));
-    showToast('warning', 'Agenda kegiatan berhasil dihapus.');
   };
 
   // 8. Assets Actions
@@ -839,23 +781,19 @@ export function AppProvider({ children }) {
       showToast('success', 'Inventaris aset lingkungan berhasil ditambahkan.');
     } catch (err) {
       console.warn('addAsset error:', err.message);
-      const fallbackAst = {
-        ...data,
-        id: `ast-${Date.now()}`,
-      };
-      setAssets(prev => [fallbackAst, ...prev]);
-      showToast('success', 'Inventaris aset lingkungan berhasil ditambahkan.');
+      showToast('error', err.message || 'Gagal menambahkan aset.');
     }
   };
 
   const updateAsset = async (id, data) => {
     try {
       await apiService.updateAsset(id, data);
+      setAssets(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
+      showToast('success', 'Data inventaris berhasil diperbarui.');
     } catch (err) {
       console.warn('updateAsset error:', err.message);
+      showToast('error', err.message || 'Gagal memperbarui aset.');
     }
-    setAssets(prev => prev.map(a => a.id === id ? { ...a, ...data } : a));
-    showToast('success', 'Data inventaris berhasil diperbarui.');
   };
 
   const deleteAsset = (id) => {
@@ -872,11 +810,12 @@ export function AppProvider({ children }) {
       if (newSettings.letterHeader) {
         await apiService.updateRegionSettings('letter_header', newSettings.letterHeader);
       }
+      setRegionSettings(prev => ({ ...prev, ...newSettings }));
+      showToast('success', 'Pengaturan profil wilayah berhasil disimpan.');
     } catch (err) {
       console.warn('updateRegionSettings error:', err.message);
+      showToast('error', err.message || 'Gagal menyimpan pengaturan wilayah.');
     }
-    setRegionSettings(prev => ({ ...prev, ...newSettings }));
-    showToast('success', 'Pengaturan profil wilayah berhasil disimpan.');
   };
 
   // Financial calculations memo
@@ -910,9 +849,11 @@ export function AppProvider({ children }) {
     // Auth & Role
     currentUser,
     activeRole,
-    switchRole,
+    isAuthenticated,
+    isCheckingAuth,
     login,
     logout,
+    switchRole,
     // Status
     isLoading,
     isApiConnected,

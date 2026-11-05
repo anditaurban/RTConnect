@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 export function IuranWarga() {
-  const { duesBills, regionSettings, payDuesBill, showToast } = useApp();
+  const { currentUser, duesBills, regionSettings, payDuesBill, showToast } = useApp();
 
   const [selectedBillForPay, setSelectedBillForPay] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('Transfer Bank BCA');
@@ -28,7 +28,8 @@ export function IuranWarga() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('Semua'); // Semua, Belum Dibayar, Lunas
 
-  const myBills = duesBills.filter(b => b.residentId === 'res-01');
+  const targetResId = currentUser?.residentId || 'res-01';
+  const myBills = duesBills.filter(b => b.residentId === targetResId || b.residentId === 'res-01' || !b.residentId);
 
   const filteredBills = activeTab === 'Semua'
     ? myBills

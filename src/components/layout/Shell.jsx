@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
-import { DemoRoleBar } from './DemoRoleBar';
 import { Navbar } from './Navbar';
 import { Sidebar } from './Sidebar';
 import { BottomNav } from './BottomNav';
@@ -52,10 +51,7 @@ export function Shell({
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans antialiased text-slate-800 dark:text-slate-100 transition-colors duration-200">
-      {/* 1. Global Demo Role Bar (Sticky top-0, h-10) */}
-      <DemoRoleBar onLogout={onLogout} />
-
-      <div className="flex-1 flex min-h-[calc(100vh-40px)]">
+      <div className="flex-1 flex min-h-screen">
         {/* 2. Pengurus Sidebar with Collapsible Nodes & Rail Mode */}
         {!isWarga && (
           <Sidebar

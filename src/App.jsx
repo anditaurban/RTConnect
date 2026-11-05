@@ -31,15 +31,25 @@ import { Forbidden403 } from './pages/errors/Forbidden403';
 import { NotFound404 } from './pages/errors/NotFound404';
 
 export function App() {
-  const { activeRole, currentUser } = useApp();
+  const { activeRole, currentUser, isAuthenticated, isCheckingAuth, logout } = useApp();
 
   // Auth flow states
-  const [isAuthenticated, setIsAuthenticated] = useState(true); // Default true for demo convenience
   const [authView, setAuthView] = useState('login'); // login or forgot
 
   // Tab navigation states
   const [wargaTab, setWargaTab] = useState('beranda');
   const [pengurusTab, setPengurusTab] = useState('dashboard');
+
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-300">Memuat RTConnect...</p>
+        </div>
+      </div>
+    );
+  }
 
   // If user is logged out, show auth views
   if (!isAuthenticated) {
@@ -48,7 +58,6 @@ export function App() {
     }
     return (
       <LoginPage
-        onLoginSuccess={() => setIsAuthenticated(true)}
         onForgotPassword={() => setAuthView('forgot')}
       />
     );
@@ -137,7 +146,7 @@ export function App() {
       currentTab={isWarga ? wargaTab : pengurusTab}
       onSelectTab={isWarga ? setWargaTab : setPengurusTab}
       activePageTitle={getPageTitle()}
-      onLogout={() => setIsAuthenticated(false)}
+      onLogout={logout}
     >
       {renderContent()}
     </Shell>

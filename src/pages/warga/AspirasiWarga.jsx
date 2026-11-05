@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 
 export function AspirasiWarga() {
-  const { complaints, addComplaint, updateComplaint, deleteComplaint } = useApp();
+  const { currentUser, complaints, addComplaint, updateComplaint, deleteComplaint } = useApp();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
@@ -41,7 +41,8 @@ export function AspirasiWarga() {
   const [error, setError] = useState('');
 
   // Filter complaints for current user
-  const myComplaints = complaints.filter(c => c.reporterId === 'res-01');
+  const targetResId = currentUser?.residentId || currentUser?.id || 'res-01';
+  const myComplaints = complaints.filter(c => c.reporterId === targetResId || c.reporterId === 'res-01' || !c.reporterId);
   const filtered = filterStatus === 'Semua'
     ? myComplaints
     : myComplaints.filter(c => c.status === filterStatus);

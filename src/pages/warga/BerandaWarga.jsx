@@ -20,12 +20,13 @@ import {
 export function BerandaWarga({ onNavigateTab }) {
   const { currentUser, duesBills, letterRequests, announcements, events } = useApp();
 
+  const targetResId = currentUser?.residentId || 'res-01';
   // Find latest unpaid or waiting dues bill for current resident
-  const myBills = duesBills.filter(b => b.residentId === 'res-01');
+  const myBills = duesBills.filter(b => b.residentId === targetResId || b.residentId === 'res-01' || !b.residentId);
   const activeBill = myBills.find(b => b.status === 'Belum Dibayar' || b.status === 'Menunggu Verifikasi') || myBills[0];
 
   // Find latest letter request for current resident
-  const myLetters = letterRequests.filter(r => r.residentId === 'res-01');
+  const myLetters = letterRequests.filter(r => r.residentId === targetResId || r.residentId === 'res-01' || !r.residentId);
   const activeLetter = myLetters[0];
 
   // Top announcements & upcoming events
@@ -42,7 +43,7 @@ export function BerandaWarga({ onNavigateTab }) {
             <span>Portal Mandiri Warga RT 01 / RW 05</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
-            Halo, {currentUser.name}!
+            Halo, {currentUser?.name || 'Warga'}!
           </h1>
           <p className="mt-1 text-xs sm:text-sm text-brand-100 leading-relaxed">
             Selamat datang di RTConnect. Kelola pengajuan surat, cek tagihan iuran keluarga, dan pantau pengumuman lingkungan dengan mudah.

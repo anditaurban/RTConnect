@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export function SuratWarga() {
-  const { letterRequests, letterTypes, addLetterRequest, updateLetterRequest, deleteLetterRequest } = useApp();
+  const { currentUser, letterRequests, letterTypes, addLetterRequest, updateLetterRequest, deleteLetterRequest } = useApp();
 
   const [filterStatus, setFilterStatus] = useState('Semua');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,7 +42,8 @@ export function SuratWarga() {
   const [selectedDetailRequest, setSelectedDetailRequest] = useState(null);
 
   // Filter requests for current citizen
-  const myRequests = letterRequests.filter(r => r.residentId === 'res-01');
+  const targetResId = currentUser?.residentId || 'res-01';
+  const myRequests = letterRequests.filter(r => r.residentId === targetResId || r.residentId === 'res-01' || !r.residentId);
   const filteredRequests = filterStatus === 'Semua'
     ? myRequests
     : myRequests.filter(r => r.status === filterStatus);
