@@ -186,7 +186,7 @@ export function Sidebar({
 
       {/* Main Sidebar Element */}
       <aside
-        className={`fixed top-10 bottom-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200/90 dark:border-slate-800 flex flex-col transition-all duration-300 ease-in-out ${
+        className={`fixed top-0 bottom-0 left-0 z-40 bg-white dark:bg-slate-900 border-r border-slate-200/90 dark:border-slate-800 flex flex-col transition-all duration-300 ease-in-out ${
           isOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         } ${isCollapsed ? 'lg:w-20' : 'lg:w-64'} w-72`}
       >
